@@ -37,4 +37,13 @@ public class URLEntity {
     @JoinColumn(name = "userID")
     private UserEntity userEntity;
 
+    public URLEntity(String originalURL, LocalDateTime createdDate, Boolean isActive){
+        this.originalURL = originalURL;
+        this.createdDate = createdDate;
+        this.isActive = isActive;
+    }
+    public URLEntity(String shortURL){
+        this.shortURL = shortURL;
+    }
+
 }
