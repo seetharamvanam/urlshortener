@@ -3,6 +3,7 @@ package com.seetharam.urlshortener.service;
 import com.seetharam.urlshortener.config.Base62Encoder;
 import com.seetharam.urlshortener.entity.URLEntity;
 import com.seetharam.urlshortener.exceptions.InvalidUrlException;
+import com.seetharam.urlshortener.exceptions.UrlNotFoundException;
 import com.seetharam.urlshortener.repository.URLRepository;
 import org.springframework.stereotype.Service;
 
@@ -36,5 +37,17 @@ public class UrlService {
         savedUrlEntity.setShortURL(shortURL);
         urlRepository.save(savedUrlEntity);
         return savedUrlEntity;
+    }
+
+    public String getOriginalURL(String shortURL){
+        if(shortURL == null || shortURL.isEmpty()){
+            throw new InvalidUrlException("Invalid URL: " + shortURL);
+        }
+        Optional<URLEntity> urlEntity = urlRepository.findByShortURLAndIsActive(shortURL,true);
+        if(urlEntity.isEmpty()){
+            throw new UrlNotFoundException("URL not found: " + shortURL);
+        }
+
+            return urlEntity.get().getOriginalURL();
     }
 }
