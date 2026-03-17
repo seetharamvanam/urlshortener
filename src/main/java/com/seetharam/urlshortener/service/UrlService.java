@@ -5,6 +5,8 @@ import com.seetharam.urlshortener.entity.URLEntity;
 import com.seetharam.urlshortener.exceptions.InvalidUrlException;
 import com.seetharam.urlshortener.exceptions.UrlNotFoundException;
 import com.seetharam.urlshortener.repository.URLRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.net.MalformedURLException;
@@ -49,5 +51,18 @@ public class UrlService {
         }
 
             return urlEntity.get().getOriginalURL();
+    }
+
+    public void deactivateShortURL(String shortURL){
+        if (shortURL == null || shortURL.isEmpty()) {
+            throw new InvalidUrlException("Invalid URL: " + shortURL);
+        }
+        Optional<URLEntity> urlEntity = urlRepository.findByShortURLAndIsActive(shortURL,true);
+        if(urlEntity.isEmpty()){
+            throw new UrlNotFoundException("URL not found: " + shortURL);
+        }
+        urlEntity.get().setIsActive(false);
+        urlRepository.save(urlEntity.get());
+
     }
 }
