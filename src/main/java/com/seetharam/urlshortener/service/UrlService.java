@@ -9,6 +9,7 @@ import com.seetharam.urlshortener.exceptions.UnAuthorizedException;
 import com.seetharam.urlshortener.exceptions.UrlNotFoundException;
 import com.seetharam.urlshortener.repository.URLRepository;
 import com.seetharam.urlshortener.repository.UserRepository;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -17,15 +18,18 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class UrlService {
     private final URLRepository urlRepository;
     private final UserRepository userRepository;
+    private final RedisTemplate<String, String> redisTemplate;
 
-    public UrlService(URLRepository urlRepository, UserRepository userRepository) {
+    public UrlService(URLRepository urlRepository, UserRepository userRepository, RedisTemplate<String, String> redisTemplate) {
         this.urlRepository = urlRepository;
         this.userRepository = userRepository;
+        this.redisTemplate = redisTemplate;
     }
 
     public URLEntity createShortURL(String originalURL) {
@@ -56,12 +60,17 @@ public class UrlService {
         if (shortURL == null || shortURL.isEmpty()) {
             throw new InvalidUrlException("Invalid URL: " + shortURL);
         }
-        Optional<URLEntity> urlEntity = urlRepository.findByShortURLAndIsActive(shortURL, true);
-        if (urlEntity.isEmpty()) {
-            throw new UrlNotFoundException("URL not found: " + shortURL);
+        String cachedUrl = redisTemplate.opsForValue().get(shortURL);
+        if (cachedUrl != null) {
+            return cachedUrl;
+        } else {
+            Optional<URLEntity> urlEntity = urlRepository.findByShortURLAndIsActive(shortURL, true);
+            if (urlEntity.isEmpty()) {
+                throw new UrlNotFoundException("URL not found: " + shortURL);
+            }
+            redisTemplate.opsForValue().set(shortURL, urlEntity.get().getOriginalURL(), 24, TimeUnit.HOURS);
+            return urlEntity.get().getOriginalURL();
         }
-
-        return urlEntity.get().getOriginalURL();
     }
 
     public void deactivateShortURL(String shortURL) {
@@ -79,6 +88,7 @@ public class UrlService {
         if (urlEntity.get().getUserEntity().getEmail().equals(getCurrentUserEmail())) {
             urlEntity.get().setIsActive(false);
             urlRepository.save(urlEntity.get());
+            redisTemplate.delete(shortURL);
         } else {
             throw new UnAuthorizedException("You are not authorized to deactivate this URL");
         }
