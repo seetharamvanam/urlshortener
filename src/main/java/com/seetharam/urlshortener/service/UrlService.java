@@ -7,6 +7,7 @@ import com.seetharam.urlshortener.exceptions.InvalidRequestException;
 import com.seetharam.urlshortener.exceptions.InvalidUrlException;
 import com.seetharam.urlshortener.exceptions.UnAuthorizedException;
 import com.seetharam.urlshortener.exceptions.UrlNotFoundException;
+import com.seetharam.urlshortener.kafka.UrlClickProducer;
 import com.seetharam.urlshortener.repository.URLRepository;
 import com.seetharam.urlshortener.repository.UserRepository;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,11 +26,13 @@ public class UrlService {
     private final URLRepository urlRepository;
     private final UserRepository userRepository;
     private final RedisTemplate<String, String> redisTemplate;
+    private final UrlClickProducer urlClickProducer;
 
-    public UrlService(URLRepository urlRepository, UserRepository userRepository, RedisTemplate<String, String> redisTemplate) {
+    public UrlService(URLRepository urlRepository, UserRepository userRepository, RedisTemplate<String, String> redisTemplate, UrlClickProducer urlClickProducer) {
         this.urlRepository = urlRepository;
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
+        this.urlClickProducer = urlClickProducer;
     }
 
     public URLEntity createShortURL(String originalURL) {
@@ -61,16 +64,19 @@ public class UrlService {
             throw new InvalidUrlException("Invalid URL: " + shortURL);
         }
         String cachedUrl = redisTemplate.opsForValue().get(shortURL);
+        String originalUrl;
         if (cachedUrl != null) {
-            return cachedUrl;
+           originalUrl = cachedUrl;
         } else {
             Optional<URLEntity> urlEntity = urlRepository.findByShortURLAndIsActive(shortURL, true);
             if (urlEntity.isEmpty()) {
                 throw new UrlNotFoundException("URL not found: " + shortURL);
             }
             redisTemplate.opsForValue().set(shortURL, urlEntity.get().getOriginalURL(), 24, TimeUnit.HOURS);
-            return urlEntity.get().getOriginalURL();
+            originalUrl = urlEntity.get().getOriginalURL();
         }
+        urlClickProducer.sendClickEvent(shortURL);
+        return originalUrl;
     }
 
     public void deactivateShortURL(String shortURL) {
