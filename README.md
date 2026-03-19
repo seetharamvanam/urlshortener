@@ -142,9 +142,4 @@ spring.datasource.password=your_password
 - `lombok` — Reduces boilerplate code
 - `postgresql` — JDBC driver
 
----
 
-## Author
-
-**Seetha Ram Rao Vanam**  
-GitHub: [@seetharamvanam](https://github.com/seetharamvanam)
